@@ -176,8 +176,20 @@ function renderTrends(trends) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-async function getJSON(url, opts) {
-  const r = await fetch(url, opts);
+/* ---- BYO (public) mode: key lives in localStorage, sent as headers ---- */
+const BYO_KEY = "cf_ledger_key";
+const byo = { on: false, key: null };
+function loadByoKey() {
+  try { byo.key = JSON.parse(localStorage.getItem(BYO_KEY) || "null"); } catch { byo.key = null; }
+}
+function saveByoKey(k) { byo.key = k; localStorage.setItem(BYO_KEY, JSON.stringify(k)); }
+function clearByoKey() { byo.key = null; localStorage.removeItem(BYO_KEY); }
+function authHeaders() {
+  return byo.on && byo.key ? { "X-CF-Token": byo.key.token, "X-CF-Account-Id": byo.key.accountId } : {};
+}
+
+async function getJSON(url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), ...authHeaders() } });
   if (!r.ok) throw new Error(`${url} -> ${r.status}`);
   return r.json();
 }
@@ -222,20 +234,44 @@ async function load() {
   // zero-setup preview), regardless of connection state.
   if (new URLSearchParams(location.search).has("demo")) return demo();
   setBilledEnabled(isFullCurrentMonth(state.from, state.to));
+
+  // Public mode with no key yet: prompt for one instead of showing demo.
+  if (byo.on && !byo.key) return showKeyPrompt();
+
   try {
-    const [report, trendsRes] = await Promise.all([
-      getJSON(costUrl()),
-      getJSON("/api/trends").catch(() => ({ trends: [] })),
-    ]);
-    if (!report.apps?.length) {
+    const report = await getJSON(costUrl());
+    if (!report.apps?.length && !byo.on) {
       const connected = await refreshStatus();
       if (!connected) return demo();
     }
     renderReport(report, false);
-    renderTrends(trendsRes.trends);
+    // No stored history in public mode, so no month-over-month chart.
+    if (byo.on) {
+      $("#trends-section").hidden = true;
+    } else {
+      $("#trends-section").hidden = false;
+      const trendsRes = await getJSON("/api/trends").catch(() => ({ trends: [] }));
+      renderTrends(trendsRes.trends);
+    }
   } catch {
-    demo();
+    if (byo.on) { byo.key ? renderError("That key did not work, or Cloudflare is unreachable.") : showKeyPrompt(); }
+    else demo();
   }
+}
+
+function showKeyPrompt() {
+  $("#trends-section").hidden = true;
+  $("#banner").className = "banner hidden";
+  $("#total").innerHTML = "$0<span class='cents'>.00</span>";
+  $("#freshness").textContent = "Enter a read-only API key to see your costs";
+  $("#body").innerHTML = `<div class="empty"><div class="big">Bring your own key.</div>
+    Enter a read-only Cloudflare API token. It is stored only in your browser and never saved on this server.
+    <div style="margin-top:18px"><button class="refresh" id="key-cta">Enter API key</button></div></div>`;
+  $("#key-cta").addEventListener("click", openModal);
+}
+
+function renderError(msg) {
+  $("#body").innerHTML = `<div class="empty"><div class="big">Could not load.</div>${esc(msg)}</div>`;
 }
 
 $("#from").addEventListener("change", (e) => { state.from = e.target.value; load(); });
@@ -265,39 +301,62 @@ $("#refresh").addEventListener("click", takeSnapshot);
 
 /* ---- connection state: drives the header (Connect button vs account chip) ---- */
 async function refreshStatus() {
-  let s = { connected: false, accountId: null, protected: true };
-  // Demo preview always shows the disconnected, protected header.
+  let s = { connected: false, accountId: null, protected: true, mode: "managed" };
   if (new URLSearchParams(location.search).has("demo")) {
-    s = { connected: false, accountId: null, protected: true };
+    s = { connected: false, accountId: null, protected: true, mode: "managed" };
   } else {
     try { s = await getJSON("/api/status"); } catch {}
   }
 
-  // Loud warning if this instance is not behind Cloudflare Access.
-  const warn = $("#secwarn");
+  byo.on = s.mode === "byo";
+  const connBtn = $("#connect"), chip = $("#conn"), refresh = $("#refresh"), warn = $("#secwarn");
+
+  if (byo.on) {
+    // Public mode is intentionally open; the key lives only in the browser.
+    warn.classList.add("hidden");
+    loadByoKey();
+    refresh.hidden = true; // nothing to snapshot server-side
+    if (byo.key) {
+      connBtn.hidden = true; chip.hidden = false;
+      $("#conn-acct").textContent = `key ${mask(byo.key.accountId)}`;
+      $("#disconnect").textContent = "forget key";
+    } else {
+      connBtn.hidden = false; chip.hidden = true;
+      connBtn.textContent = "Enter API key";
+    }
+    return !!byo.key;
+  }
+
+  // Managed mode: warn loudly if not behind Cloudflare Access.
   if (s.protected === false) {
     warn.classList.remove("hidden");
     warn.innerHTML = "<b>Not protected.</b> Anyone with this URL can see your cost data. Put it behind Cloudflare Access (Zero Trust) so it requires a login. See the README.";
   } else {
     warn.classList.add("hidden");
   }
-
-  const connBtn = $("#connect"), chip = $("#conn"), refresh = $("#refresh");
   if (s.connected) {
-    connBtn.hidden = true;
-    chip.hidden = false;
-    refresh.hidden = false;
+    connBtn.hidden = true; chip.hidden = false; refresh.hidden = false;
     $("#conn-acct").textContent = `account ${s.accountId || ""}`.trim();
   } else {
-    connBtn.hidden = false;
-    chip.hidden = true;
-    refresh.hidden = true;
+    connBtn.hidden = false; chip.hidden = true; refresh.hidden = true;
   }
   return s.connected;
 }
 
+const mask = (id) => (id && id.length > 4 ? "****" + id.slice(-4) : "****");
+
 const modal = $("#modal");
-const openModal = () => { $("#f-err").textContent = ""; modal.classList.add("open"); $("#f-token").focus(); };
+const openModal = () => {
+  $("#f-err").textContent = "";
+  // Public mode: make it explicit the key stays in the browser.
+  if (byo.on) {
+    $("#modal-desc").textContent = "Paste a read-only API token and your account id. They are stored only in your browser (localStorage) and sent with each request, never saved or logged on this server.";
+    $("#modal-warn").innerHTML = "Use a <b>read-only</b> token. For full control, self-host (same open-source code).";
+    $("#f-connect").textContent = "Save key";
+  }
+  modal.classList.add("open");
+  $("#f-token").focus();
+};
 const closeModal = () => modal.classList.remove("open");
 
 $("#connect").addEventListener("click", openModal);
@@ -312,26 +371,46 @@ $("#f-connect").addEventListener("click", async () => {
   if (!token || !accountId) { err.textContent = "Both fields are required."; return; }
   btn.disabled = true; btn.textContent = "Validating...";
   try {
-    const res = await fetch("/api/connect", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token, accountId }),
-    });
-    const out = await res.json();
-    if (!res.ok || !out.ok) throw new Error(out.error || "Could not connect.");
-    $("#f-token").value = ""; $("#f-account").value = "";
-    closeModal();
-    await refreshStatus();
-    // Auto-backfill so the dashboard fills with the current month immediately.
-    await takeSnapshot();
+    if (byo.on) {
+      // Public mode: verify against Cloudflare, then keep the key in the browser.
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "X-CF-Token": token, "X-CF-Account-Id": accountId },
+      });
+      const out = await res.json();
+      if (!res.ok || !out.ok) throw new Error(out.error || "Could not verify that key.");
+      saveByoKey({ token, accountId });
+      $("#f-token").value = ""; $("#f-account").value = "";
+      closeModal();
+      await refreshStatus();
+      await load();
+    } else {
+      const res = await fetch("/api/connect", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, accountId }),
+      });
+      const out = await res.json();
+      if (!res.ok || !out.ok) throw new Error(out.error || "Could not connect.");
+      $("#f-token").value = ""; $("#f-account").value = "";
+      closeModal();
+      await refreshStatus();
+      await takeSnapshot();
+    }
   } catch (e) {
     err.textContent = e.message;
   } finally {
-    btn.disabled = false; btn.textContent = "Connect";
+    btn.disabled = false; btn.textContent = byo.on ? "Save key" : "Connect";
   }
 });
 
 $("#disconnect").addEventListener("click", async () => {
+  if (byo.on) {
+    if (!confirm("Forget your API key from this browser?")) return;
+    clearByoKey();
+    await refreshStatus();
+    return load();
+  }
   if (!confirm("Disconnect this Cloudflare account from the dashboard?")) return;
   try { await fetch("/api/disconnect", { method: "POST" }); } catch {}
   await refreshStatus();
@@ -378,8 +457,10 @@ function monthShift(m, d) {
   return dt.toISOString().slice(0, 7);
 }
 
-syncDateInputs();
-syncCostMode();
-refreshStatus();
-load();
-if (location.hash === "#connect") openModal();
+(async () => {
+  syncDateInputs();
+  syncCostMode();
+  await refreshStatus();
+  await load();
+  if (location.hash === "#connect") openModal();
+})();

@@ -67,8 +67,10 @@
 
       <div id="body"></div>
 
-      <div class="section-head"><h2>Month over month</h2><span class="hint">last 12 snapshots</span></div>
-      <div class="chart-card"><canvas id="trend"></canvas></div>
+      <div id="trends-section">
+        <div class="section-head"><h2>Month over month</h2><span class="hint">last 12 snapshots</span></div>
+        <div class="chart-card"><canvas id="trend"></canvas></div>
+      </div>
 
       <footer>
         cf-ledger . figures are estimates from Cloudflare analytics, not an invoice .
@@ -81,8 +83,8 @@
         <span class="corner tl"></span><span class="corner tr"></span>
         <span class="corner bl"></span><span class="corner br"></span>
         <h3>Connect Cloudflare</h3>
-        <p>Paste a read-only API token and your account id. Validated live against Cloudflare, then stored in this Worker's D1.</p>
-        <div class="warn">Keep this dashboard behind Cloudflare Access. The token is read-only, but it can read your account.</div>
+        <p id="modal-desc">Paste a read-only API token and your account id. Validated live against Cloudflare, then stored in this Worker's D1.</p>
+        <div class="warn" id="modal-warn">Keep this dashboard behind Cloudflare Access. The token is read-only, but it can read your account.</div>
         <div class="field">
           <label for="f-token">API token</label>
           <input id="f-token" type="password" placeholder="read-only token" autocomplete="off" spellcheck="false" />
@@ -112,7 +114,7 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/vendor/chart.umd.min.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

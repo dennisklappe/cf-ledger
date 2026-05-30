@@ -14,21 +14,31 @@
  * behind Cloudflare Access (configured in the dashboard, not here).
  */
 
-import { collectRange } from "./collect";
+import { collectRange, collectWindow, type Creds } from "./collect";
 import { SnapshotStore } from "./db/snapshots";
 import { buildReport } from "./cost/attribute";
-import { getCreds, connect, disconnect, connectionStatus } from "./config";
+import { getCreds, connect, disconnect, connectionStatus, verifyCreds } from "./config";
 import { ensureSchema } from "./db/migrate";
 import { checkAccess } from "./auth";
 import type { CostReport } from "./types";
 
 export interface Env {
   ASSETS: Fetcher;
-  DB: D1Database;
+  /** Required in managed mode; unused (and unbound) in BYO public mode. */
+  DB?: D1Database;
+  /** "byo" = public, stateless, bring-your-own-key. Anything else = managed. */
+  MODE?: string;
   CF_API_TOKEN?: string;
   CF_ACCOUNT_ID?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
+}
+
+/** Per-request credentials from headers (BYO mode), or null. */
+function headerCreds(request: Request): Creds | null {
+  const token = request.headers.get("X-CF-Token");
+  const accountId = request.headers.get("X-CF-Account-Id");
+  return token && accountId ? { token, accountId } : null;
 }
 
 const json = (data: unknown, status = 200): Response =>
@@ -71,8 +81,60 @@ async function reportForRange(store: SnapshotStore, from: string, to: string): P
   return { ...report, lastUpdated: usage.lastUpdated, collectionGaps: usage.gaps, mode: "range", listPrice: true };
 }
 
+/** Stateless live report (BYO public mode): compute from Cloudflare, store nothing. */
+async function liveReport(creds: Creds, url: URL): Promise<ApiReport> {
+  const now = new Date();
+  const from = url.searchParams.get("from");
+  const to = url.searchParams.get("to");
+  if (from && to) {
+    const end = new Date(`${to}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + 1);
+    const win = await collectWindow(creds, `${from}T00:00:00Z`, end.toISOString());
+    const label = from === to ? from : `${from} to ${to}`;
+    const report = buildReport(label, win.resources, win.bindings, {
+      applyFreeAllowance: false,
+      includePlatformFee: false,
+    });
+    return { ...report, lastUpdated: now.toISOString(), collectionGaps: win.gaps, mode: "range", listPrice: true };
+  }
+  const month = url.searchParams.get("month") || currentMonth(now);
+  const applyFree = url.searchParams.get("free") !== "0";
+  const win = await collectWindow(creds, `${month}-01T00:00:00Z`, now.toISOString());
+  const report = buildReport(month, win.resources, win.bindings, {
+    applyFreeAllowance: applyFree,
+    includePlatformFee: true,
+  });
+  return { ...report, lastUpdated: now.toISOString(), collectionGaps: win.gaps, mode: "month", listPrice: !applyFree };
+}
+
+/** Public (BYO-key) routes: per-request key via headers, nothing stored. */
+async function byoFetch(request: Request, env: Env, url: URL): Promise<Response> {
+  const { pathname } = url;
+  if (pathname === "/api/status") return json({ mode: "byo" });
+
+  const creds = headerCreds(request);
+  if (pathname === "/api/verify" && request.method === "POST") {
+    if (!creds) return json({ ok: false, error: "Missing API key or account id." }, 400);
+    try {
+      await verifyCreds(creds.token, creds.accountId);
+      return json({ ok: true });
+    } catch (e) {
+      return json({ ok: false, error: (e as Error).message }, 400);
+    }
+  }
+  if (pathname === "/api/costs") {
+    if (!creds) return json({ error: "No API key provided.", needKey: true }, 401);
+    return json(await liveReport(creds, url));
+  }
+  if (pathname === "/api/trends") return json({ trends: [], unavailable: true });
+  if (pathname === "/api/months") return json({ months: [] });
+  if (pathname.startsWith("/api/")) return json({ error: "Not available in public mode." }, 404);
+  return env.ASSETS.fetch(request);
+}
+
 /** Snapshot the `days` most recent days (today back) and store them. */
 async function runSnapshot(env: Env, days: number): Promise<{ day: string; status: string }[]> {
+  if (!env.DB) throw new Error("No database binding.");
   const store = new SnapshotStore(env.DB);
   const c = await getCreds(env);
   if (!c) {
@@ -99,9 +161,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
-    const store = new SnapshotStore(env.DB);
 
     try {
+      // Public stateless mode: bring-your-own-key, no storage, no Access.
+      if (env.MODE === "byo") return await byoFetch(request, env, url);
+
+      if (!env.DB) return json({ error: "Server misconfigured: no database binding." }, 500);
+      const store = new SnapshotStore(env.DB);
       await ensureSchema(env.DB);
 
       // Cloudflare Access enforcement. Fails closed when configured.
@@ -176,8 +242,10 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (env.MODE === "byo" || !env.DB) return; // public mode is stateless
+    const db = env.DB;
     // Re-snapshot yesterday (now complete) and today (partial, refreshed daily).
-    ctx.waitUntil(ensureSchema(env.DB).then(() => runSnapshot(env, 2)).then(() => undefined));
+    ctx.waitUntil(ensureSchema(db).then(() => runSnapshot(env, 2)).then(() => undefined));
   },
 };
 

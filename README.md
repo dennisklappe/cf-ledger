@@ -10,15 +10,22 @@ It snapshots your account's usage daily, attributes it **per application** in
 
 <sub>Sample data. Per-app dollar costs, ranked, with a shared / unattributed section for the cost leaks.</sub>
 
-## Two ways to run it
+## Just want to see your costs?
 
-- **[Deploy to Cloudflare](#launch-it-on-cloudflare)** — always-on, takes daily
-  snapshots automatically. Public URL, so it needs a login (Cloudflare Access).
-- **[Run it locally](#run-it-locally)** — fully private. Nothing is deployed,
-  there is no public URL, your token and data never leave your machine, and no
-  Access setup is needed. You click Refresh when you want fresh numbers.
+Use the hosted version, no install: **[cf-ledger.klappe.dev](https://cf-ledger.klappe.dev)**.
+Paste a read-only API token; it stays in your browser and is never stored on the
+server. It's stateless (zero setup, but no saved history). How it works:
+[below](#how-the-hosted-version-works).
 
-Both use the same code and the same in-dashboard Connect flow.
+## Run your own
+
+For an always-on instance with saved month-over-month history, host it yourself.
+Both options below use the normal stored-token mode:
+
+- **[Deploy to Cloudflare](#launch-it-on-cloudflare)** — always-on, daily
+  snapshots, behind a Cloudflare Access login.
+- **[Run it locally](#run-it-locally)** — fully private, nothing deployed, your
+  token and data never leave your machine.
 
 ## Launch it on Cloudflare
 
@@ -217,6 +224,20 @@ For contributors:
 npm test               # unit tests for the cost math and attribution
 npm run typecheck
 ```
+
+## How the hosted version works
+
+[cf-ledger.klappe.dev](https://cf-ledger.klappe.dev) runs this same Worker in a
+stateless mode (the `MODE=byo` var) for people who don't want to deploy anything:
+
+- No storage, no Access. Your token + account id stay in your browser
+  (`localStorage`), are sent as headers per request, used to query Cloudflare
+  live, and never stored or logged on the server.
+- Stateless, so no history (no month-over-month chart), just the live current
+  window (up to ~31 days).
+- Honest note: Cloudflare's API has no browser CORS, so the token passes through
+  the Worker on each request, transit, not storage. If you'd rather it never
+  touch someone else's server, run your own (above), that's the normal mode.
 
 ## Updating
 
