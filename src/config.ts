@@ -13,7 +13,7 @@
 import type { Creds } from "./collect";
 
 interface Env {
-  DB: D1Database;
+  DB?: D1Database;
   CF_API_TOKEN?: string;
   CF_ACCOUNT_ID?: string;
 }
@@ -28,8 +28,8 @@ async function readConfig(db: D1Database, key: string): Promise<string | null> {
 
 /** Resolve usable credentials, or null if neither source is configured. */
 export async function getCreds(env: Env): Promise<(Creds & { source: "ui" | "secret" }) | null> {
-  const token = await readConfig(env.DB, K_TOKEN);
-  const accountId = await readConfig(env.DB, K_ACCOUNT);
+  const token = env.DB ? await readConfig(env.DB, K_TOKEN) : null;
+  const accountId = env.DB ? await readConfig(env.DB, K_ACCOUNT) : null;
   if (token && accountId) return { token, accountId, source: "ui" };
   if (env.CF_API_TOKEN && env.CF_ACCOUNT_ID) {
     return { token: env.CF_API_TOKEN, accountId: env.CF_ACCOUNT_ID, source: "secret" };
@@ -53,23 +53,31 @@ export async function connectionStatus(env: Env): Promise<ConnectionStatus> {
  * Validate a token + account against Cloudflare, then persist them.
  * Throws with a human message if the credentials do not work.
  */
-export async function connect(env: Env, token: string, accountId: string): Promise<void> {
+/**
+ * Validate a token + account against Cloudflare. Throws a human message if they
+ * do not work. Used by both the stored Connect flow and the stateless live mode.
+ */
+export async function verifyCreds(token: string, accountId: string): Promise<void> {
   token = token.trim();
   accountId = accountId.trim();
   if (!token || !accountId) throw new Error("Both an API token and an account id are required.");
 
-  // 1. Is the token itself valid and active?
   const verify = await cf(`/user/tokens/verify`, token);
   if (!verify.ok) throw new Error("That API token is invalid or inactive.");
 
-  // 2. Does it actually grant read access to THIS account? (cheapest probe)
   const probe = await cf(`/accounts/${accountId}/workers/scripts`, token);
   if (!probe.ok) {
     throw new Error(
       "Token is valid but cannot read this account. Check the account id and that the token has Workers Scripts: Read.",
     );
   }
+}
 
+export async function connect(env: Env, token: string, accountId: string): Promise<void> {
+  token = token.trim();
+  accountId = accountId.trim();
+  await verifyCreds(token, accountId);
+  if (!env.DB) throw new Error("No database binding.");
   await env.DB.batch([
     env.DB.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").bind(K_TOKEN, token),
     env.DB.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").bind(K_ACCOUNT, accountId),
@@ -78,6 +86,7 @@ export async function connect(env: Env, token: string, accountId: string): Promi
 
 /** Remove UI-stored credentials (falls back to secrets, if any). */
 export async function disconnect(env: Env): Promise<void> {
+  if (!env.DB) return;
   await env.DB.batch([
     env.DB.prepare("DELETE FROM config WHERE key = ?").bind(K_TOKEN),
     env.DB.prepare("DELETE FROM config WHERE key = ?").bind(K_ACCOUNT),

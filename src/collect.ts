@@ -126,6 +126,36 @@ export async function collectRange(creds: Creds, days: number, now: Date): Promi
   return snapshots;
 }
 
+/**
+ * Collect usage for one arbitrary window in a single pass (no per-day loop).
+ * Used by the stateless public (BYO-key) mode: one inventory pass + one
+ * GraphQL query per dataset, nothing stored.
+ */
+export async function collectWindow(
+  creds: Creds,
+  start: string,
+  end: string,
+): Promise<{ resources: ResourceUsage[]; bindings: BindingGraph; gaps: string[] }> {
+  const rest = new RestClient(creds.accountId, creds.token);
+  const gql = new GraphqlClient(creds.accountId, creds.token);
+  const inv = await fetchInventory(rest);
+  const byKey = seedResources(inv);
+  const usage = await gql.collect({ start, end });
+  for (const [key, { name, metrics }] of usage.metrics) {
+    const [kind, ...rest] = key.split(":");
+    const id = rest.join(":");
+    let r = byKey.get(key);
+    if (!r) {
+      r = { kind: kind as ResourceUsage["kind"], id, name, metrics: {} };
+      byKey.set(key, r);
+    }
+    for (const [metric, value] of Object.entries(metrics)) {
+      r.metrics[metric as keyof typeof r.metrics] = value;
+    }
+  }
+  return { resources: [...byKey.values()], bindings: inv.bindings, gaps: [...inv.gaps, ...usage.gaps] };
+}
+
 /** Collect a single day (used by the daily cron via collectRange of 1). */
 export async function collectDay(creds: Creds, day: string, now: Date): Promise<DaySnapshot> {
   // Find how many days back `day` is so collectRange's window logic applies.
