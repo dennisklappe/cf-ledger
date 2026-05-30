@@ -1,0 +1,239 @@
+/* cf-ledger - Cloudflare design language.
+   Near-black canvas, signature orange hero with sunrise glow, dashed
+   engineering grid with corner registration marks, Geist + Geist Mono. */
+
+:root {
+  --bg: #0a0a0b;
+  --panel: #0e0e11;
+  --card: #101013;
+  --ink: #f3f3f4;
+  --dim: #9a9aa3;
+  --faint: #5a5a64;
+  --line: #222228;
+  --dash: #2e2e37;
+  --cf: #f6821f;
+  --cf-bright: #ff9a4d;
+  --cf-deep: #e3700f;
+  --alert: #ff5b4d;
+  --warn: #ffb020;
+  --ok: #3fcf8e;
+  --radius: 5px;
+  --maxw: 1140px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Geist", system-ui, sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+body::after {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; opacity: 0.02; z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+main.wrap { border-left: 1px dashed var(--dash); border-right: 1px dashed var(--dash); padding-bottom: 0; }
+
+/* corner registration marks (the Cloudflare "+" ticks) */
+.corner { position: absolute; width: 7px; height: 7px; z-index: 2; }
+.corner::before, .corner::after { content: ""; position: absolute; background: var(--cf); }
+.corner::before { left: 50%; top: 0; width: 1px; height: 100%; transform: translateX(-50%); }
+.corner::after { top: 50%; left: 0; height: 1px; width: 100%; transform: translateY(-50%); }
+.corner.tl { top: -4px; left: -4px; } .corner.tr { top: -4px; right: -4px; }
+.corner.bl { bottom: -4px; left: -4px; } .corner.br { bottom: -4px; right: -4px; }
+
+/* ---- top bar ---- */
+header {
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(12px);
+  background: rgba(10, 10, 11, 0.78);
+}
+.bar { display: flex; align-items: center; gap: 18px; padding: 16px 28px; }
+.brand { display: flex; align-items: baseline; gap: 11px; }
+.brand .mark { font-size: 16px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+.brand .mark em { color: var(--cf); font-style: normal; }
+.brand .tag { font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--faint); }
+.bar .spacer { flex: 1; }
+
+select, button.ghost {
+  font-family: "Geist Mono", monospace; font-size: 12px; color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 15px; cursor: pointer;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+select:hover, button.ghost:hover { border-color: var(--cf); }
+
+button.refresh, #connect {
+  font-family: "Geist Mono", monospace; font-size: 12px; color: #fff;
+  background: var(--cf); border: none; border-radius: 999px;
+  padding: 9px 18px; cursor: pointer; font-weight: 600; letter-spacing: 0.2px;
+  transition: transform 0.15s var(--ease), background 0.2s var(--ease);
+}
+button.refresh:hover, #connect:hover { background: var(--cf-bright); transform: translateY(-1px); }
+button.refresh:disabled { opacity: 0.5; cursor: progress; transform: none; }
+
+.conn { display: flex; align-items: center; gap: 9px; font-family: "Geist Mono", monospace; font-size: 12px; color: var(--dim); }
+.conn[hidden] { display: none; }
+.conn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 9px var(--ok); }
+.conn button { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; font-family: inherit; }
+.conn button:hover { color: var(--cf); }
+
+/* ---- controls strip ---- */
+.controls { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 22px 0 2px; }
+.dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.datefield { display: flex; align-items: center; gap: 8px; font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--faint); }
+.datefield input { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color-scheme: dark; }
+.datefield input:focus { outline: none; border-color: var(--cf); }
+.toggles { display: flex; align-items: center; gap: 14px; }
+.seg-group { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--dim); background: transparent; border: none; padding: 7px 14px; cursor: pointer; transition: background 0.15s var(--ease), color 0.15s var(--ease); }
+.seg:hover:not(.active):not(:disabled) { color: var(--ink); }
+.seg.active { background: var(--cf); color: #fff; }
+.seg-group.disabled { opacity: 0.4; }
+.seg-group.disabled .seg { cursor: not-allowed; }
+.checktoggle { display: flex; align-items: center; gap: 7px; font-family: "Geist Mono", monospace; font-size: 11px; color: var(--dim); cursor: pointer; user-select: none; }
+.checktoggle input { accent-color: var(--cf); width: 14px; height: 14px; }
+
+/* ---- hero ---- */
+.hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; margin: 34px 0 8px; }
+.hero-block {
+  position: relative; overflow: hidden; border-radius: 6px;
+  background: linear-gradient(168deg, #f6821f 0%, #ee7613 55%, #df6c0e 100%);
+  padding: 36px 34px 72px; min-height: 308px;
+  display: flex; flex-direction: column;
+}
+.hero-block .label { font-family: "Geist Mono", monospace; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); margin-bottom: auto; }
+.hero-block .total {
+  color: #fff; font-size: clamp(58px, 8.5vw, 116px); font-weight: 600;
+  line-height: 0.9; letter-spacing: -0.05em; font-variant-numeric: tabular-nums;
+  position: relative; z-index: 1;
+}
+.hero-block .total .cents { color: rgba(255, 255, 255, 0.62); }
+.hero-block .glow {
+  position: absolute; left: 50%; bottom: -78px; transform: translateX(-50%);
+  width: 74%; height: 180px; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at center bottom, rgba(255, 255, 255, 0.95), rgba(255, 238, 205, 0.55) 34%, rgba(255, 238, 205, 0) 70%);
+  filter: blur(7px);
+}
+
+.split { padding-left: 28px; border-left: 1px dashed var(--dash); display: flex; flex-direction: column; justify-content: flex-end; }
+.split .sub { color: var(--dim); font-family: "Geist Mono", monospace; font-size: 12px; margin-bottom: 16px; }
+.split .sub b { color: var(--ink); }
+.split .row { display: flex; justify-content: space-between; align-items: baseline; padding: 13px 0; border-top: 1px dashed var(--dash); }
+.split .row span { color: var(--dim); font-size: 13px; }
+.split .row b { font-family: "Geist Mono", monospace; font-size: 17px; font-weight: 500; }
+
+/* ---- banner ---- */
+.banner {
+  border: 1px solid var(--line); border-left: 2px solid var(--warn);
+  background: var(--panel); border-radius: var(--radius);
+  padding: 12px 15px; margin: 22px 0 4px; font-size: 13px; color: var(--dim);
+  font-family: "Geist Mono", monospace; line-height: 1.6;
+}
+.banner.demo { border-left-color: var(--cf); }
+.banner.secwarn { border-left-color: var(--alert); color: var(--ink); margin: 22px 0 0; }
+.banner.secwarn b { color: var(--alert); }
+.banner b { color: var(--ink); }
+.banner.hidden { display: none; }
+
+/* ---- section ---- */
+.section-head { position: relative; display: flex; align-items: baseline; gap: 12px; margin: 48px 0 16px; padding-top: 20px; border-top: 1px dashed var(--dash); }
+.section-head::before { content: "+"; position: absolute; top: -9px; left: -5px; color: var(--cf); font-size: 15px; line-height: 1; }
+.section-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.section-head .hint { font-family: "Geist Mono", monospace; color: var(--faint); font-size: 11px; }
+
+/* ---- app rows ---- */
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.app {
+  position: relative; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+  opacity: 0; transform: translateY(10px); animation: rise 0.55s var(--ease) forwards;
+}
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .app { animation: none; opacity: 1; transform: none; } }
+.app:hover { border-color: #34343c; background: #131318; }
+.app.standalone { border-left: 2px solid var(--alert); }
+.app.shared { border-left: 2px solid var(--warn); }
+
+.app .summary { display: grid; grid-template-columns: 18px 1.4fr 2fr auto; align-items: center; gap: 16px; padding: 16px 18px; cursor: pointer; }
+.app .chev { color: var(--faint); transition: transform 0.25s var(--ease); font-size: 11px; }
+.app.open .chev { transform: rotate(90deg); }
+.app .name { display: flex; flex-direction: column; gap: 3px; }
+.app .name .n { font-size: 15px; font-weight: 600; }
+.app .name .k { font-family: "Geist Mono", monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
+
+.heat { height: 6px; border-radius: 3px; background: #1b1b20; overflow: hidden; }
+.heat > i { display: block; height: 100%; border-radius: 3px; transition: width 0.7s var(--ease); }
+
+.app .cost { font-family: "Geist Mono", monospace; font-size: 19px; text-align: right; white-space: nowrap; }
+.app .cost .cents { color: var(--dim); font-size: 0.68em; }
+
+.detail { max-height: 0; overflow: hidden; transition: max-height 0.35s var(--ease); border-top: 1px solid transparent; }
+.app.open .detail { max-height: 620px; border-top-color: var(--line); }
+.lines { padding: 6px 18px 16px 52px; }
+.line { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.line:last-child { border-bottom: none; }
+.line .lname { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--dim); }
+.line .lname b { color: var(--ink); font-weight: 500; }
+.line .lunits { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--faint); text-align: right; }
+.line .lcost { font-family: "Geist Mono", monospace; font-size: 13px; text-align: right; min-width: 70px; }
+
+/* ---- trends ---- */
+.chart-card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+#trend { width: 100%; height: 270px; }
+
+.empty { text-align: center; padding: 72px 20px; color: var(--dim); }
+.empty .big { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 8px; }
+
+footer { color: var(--faint); font-size: 11px; text-align: center; padding: 52px 0 36px; font-family: "Geist Mono", monospace; }
+footer a { color: var(--dim); }
+
+/* ---- connect modal ---- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(5, 5, 6, 0.74); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s var(--ease);
+}
+.modal-backdrop.open { opacity: 1; pointer-events: auto; }
+.modal {
+  position: relative; width: min(440px, 92vw); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 28px;
+  transform: translateY(8px) scale(0.99); transition: transform 0.25s var(--ease);
+}
+.modal-backdrop.open .modal { transform: none; }
+.modal h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 7px; }
+.modal p { font-size: 13px; color: var(--dim); line-height: 1.55; }
+.modal .warn { font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--warn); background: rgba(255, 176, 32, 0.06); border: 1px solid rgba(255, 176, 32, 0.22); border-radius: 5px; padding: 9px 11px; margin: 14px 0; line-height: 1.5; }
+.field { margin: 13px 0; }
+.field label { display: block; font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--faint); margin-bottom: 6px; }
+.field input { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 11px 13px; color: var(--ink); font-family: "Geist Mono", monospace; font-size: 13px; }
+.field input:focus { outline: none; border-color: var(--cf); }
+.docs { display: inline-block; color: var(--cf); font-size: 12px; margin-top: 2px; text-decoration: none; }
+.docs:hover { text-decoration: underline; }
+.perms { margin-top: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.perms summary { cursor: pointer; font-family: "Geist Mono", monospace; font-size: 11.5px; color: var(--cf); padding: 9px 11px; list-style: none; }
+.perms summary::-webkit-details-marker { display: none; }
+.perms[open] summary { border-bottom: 1px dashed var(--line); }
+.perms p { font-size: 12px; color: var(--dim); padding: 9px 11px 0; line-height: 1.5; }
+.perms p.muted { color: var(--faint); font-size: 11px; padding: 8px 11px 11px; }
+.perm-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 11px 2px; }
+.perm { display: inline-flex; align-items: center; gap: 6px; font-family: "Geist Mono", monospace; font-size: 11px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+.perm::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--cf); flex: none; }
+.err { color: var(--alert); font-size: 12.5px; min-height: 17px; margin-top: 8px; font-family: "Geist Mono", monospace; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .split { padding-left: 0; border-left: none; margin-top: 18px; }
+  .app .summary { grid-template-columns: 16px 1fr auto; }
+  .app .summary .heat { display: none; }
+}

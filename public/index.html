@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ledger - Cloudflare cost by app</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap bar">
+        <div class="brand">
+          <span class="mark">Led<em>g</em>er</span>
+          <span class="tag">Cloudflare cost by app</span>
+        </div>
+        <div class="spacer"></div>
+        <span class="conn" id="conn" hidden>
+          <span class="dot"></span><span id="conn-acct">connected</span>
+          <button id="disconnect" title="Disconnect">disconnect</button>
+        </span>
+        <button class="ghost" id="connect">Connect Cloudflare</button>
+        <button class="refresh" id="refresh" hidden>Refresh</button>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="banner secwarn hidden" id="secwarn"></div>
+
+      <div class="controls">
+        <div class="dates">
+          <label class="datefield">From <input type="date" id="from" /></label>
+          <label class="datefield">To <input type="date" id="to" /></label>
+          <button class="ghost" id="thismonth">This month</button>
+        </div>
+        <div class="toggles">
+          <div class="seg-group" id="costmode" title="Billed applies free allowances and only works for a full month">
+            <button class="seg active" data-free="0">List price</button>
+            <button class="seg" data-free="1">Billed</button>
+          </div>
+          <label class="checktoggle"><input type="checkbox" id="hidezeros" checked /> Hide $0</label>
+        </div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-block">
+          <span class="corner tl"></span><span class="corner tr"></span>
+          <span class="corner bl"></span><span class="corner br"></span>
+          <div class="label">Estimated spend / <span id="month-label">this month</span></div>
+          <div class="total" id="total">$0<span class="cents">.00</span></div>
+          <div class="glow"></div>
+        </div>
+        <div class="split">
+          <div class="sub" id="freshness">No data yet</div>
+          <div class="row"><span>Usage, metered</span><b id="usage">$0.00</b></div>
+          <div class="row"><span>Workers Paid platform fee</span><b id="platform">$5.00</b></div>
+          <div class="row"><span>Pricing table dated</span><b id="asof">-</b></div>
+        </div>
+      </section>
+
+      <div class="banner hidden" id="banner"></div>
+
+      <div id="body"></div>
+
+      <div class="section-head"><h2>Month over month</h2><span class="hint">last 12 snapshots</span></div>
+      <div class="chart-card"><canvas id="trend"></canvas></div>
+
+      <footer>
+        cf-ledger . figures are estimates from Cloudflare analytics, not an invoice .
+        <a href="https://github.com/dennisklappe/cf-ledger" id="repo">github.com/dennisklappe/cf-ledger</a>
+      </footer>
+    </main>
+
+    <div class="modal-backdrop" id="modal">
+      <div class="modal">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <h3>Connect Cloudflare</h3>
+        <p>Paste a read-only API token and your account id. Validated live against Cloudflare, then stored in this Worker's D1.</p>
+        <div class="warn">Keep this dashboard behind Cloudflare Access. The token is read-only, but it can read your account.</div>
+        <div class="field">
+          <label for="f-token">API token</label>
+          <input id="f-token" type="password" placeholder="read-only token" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="field">
+          <label for="f-account">Account ID</label>
+          <input id="f-account" type="text" placeholder="cloudflare account id" autocomplete="off" spellcheck="false" />
+        </div>
+        <details class="perms">
+          <summary>Which token permissions? (5, all Read)</summary>
+          <p>In <b>Create Custom Token</b>, add these exact <b>Account</b> groups, each set to <b>Read</b>:</p>
+          <div class="perm-list">
+            <span class="perm">Account Analytics</span>
+            <span class="perm">Workers Scripts</span>
+            <span class="perm">Workers KV Storage</span>
+            <span class="perm">Workers R2 Storage</span>
+            <span class="perm">D1</span>
+          </div>
+          <p class="muted">Ignore every other "Workers" row and all Zone permissions. Set Account Resources to include your account.</p>
+        </details>
+        <a class="docs" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">Open the API Tokens page</a>
+        <div class="err" id="f-err"></div>
+        <div class="actions">
+          <button class="ghost" id="f-cancel">Cancel</button>
+          <button class="refresh" id="f-connect">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

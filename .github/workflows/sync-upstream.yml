@@ -1,0 +1,39 @@
+# Keeps a deployed copy of cf-ledger up to date with the upstream project.
+#
+# In YOUR clone/fork this is a one-click (or scheduled) update: it fast-forwards
+# your main branch from dennisklappe/cf-ledger and pushes, which makes Workers
+# Builds redeploy automatically. It does nothing on the upstream repo itself,
+# and if your copy has diverged (you customized it) it skips safely rather than
+# forcing anything. For diverged copies, see "Updating" in the README.
+name: Sync from upstream
+
+on:
+  workflow_dispatch: # the "Run workflow" button = one-click update
+  schedule:
+    - cron: "0 6 * * 1" # also weekly, Mondays 06:00 UTC. Delete this to go manual-only.
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    # Never run on the source repository, only on downstream copies.
+    if: github.repository != 'dennisklappe/cf-ledger'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fast-forward from upstream and push
+        run: |
+          git remote add upstream https://github.com/dennisklappe/cf-ledger.git
+          git fetch upstream main
+          if git merge-base --is-ancestor HEAD upstream/main; then
+            git merge --ff-only upstream/main
+            git push origin HEAD
+            echo "Synced to upstream. Workers Builds will redeploy."
+          else
+            echo "Your copy has diverged from upstream; not auto-syncing."
+            echo "See the Updating section in the README to merge manually."
+          fi

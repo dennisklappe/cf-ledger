@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cf-ledger",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-01",
+  "observability": { "enabled": true },
+
+  // Serves everything in ./public (the dashboard UI). The Worker handles
+  // /api/* itself and falls back to these assets for all other routes.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // Daily snapshot of usage -> cost into D1. 03:17 UTC (offset to avoid the
+  // top-of-hour thundering herd, and to let Cloudflare's analytics settle).
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+
+  // History store. An empty database_id tells the Deploy button and
+  // `wrangler deploy` to provision a new D1 automatically. For local dev,
+  // `npm run db:init` creates a local copy. If you deploy from the CLI and want
+  // to reuse an existing database, paste its id here.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cf_ledger",
+      "database_id": ""
+    }
+  ]
+
+  // Secrets (set with `wrangler secret put`):
+  //   CF_API_TOKEN   - read-only token (Account Analytics, Workers Scripts,
+  //                    Workers KV, D1, R2 -- all Read)
+  //   CF_ACCOUNT_ID  - your Cloudflare account id
+}

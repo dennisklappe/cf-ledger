@@ -1,0 +1,23 @@
+{
+  "name": "cf-ledger",
+  "version": "0.1.0",
+  "description": "Per-application cost attribution dashboard for Cloudflare, served by a Worker.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "snapshot:local": "wrangler dev --test-scheduled",
+    "db:init": "wrangler d1 execute cf_ledger --file=./src/db/schema.sql",
+    "db:init:remote": "wrangler d1 execute cf_ledger --remote --file=./src/db/schema.sql",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250501.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.90.0"
+  }
+}
