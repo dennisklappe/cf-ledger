@@ -236,7 +236,7 @@ stateless mode (the `MODE=byo` var) for people who don't want to deploy anything
 - Stateless, so no history (no month-over-month chart), just the live current
   window (up to ~31 days).
 - Honest note: Cloudflare's API has no browser CORS, so the token passes through
-  the Worker on each request, transit, not storage. If you'd rather it never
+  the Worker on each request, in transit, not stored. If you'd rather it never
   touch someone else's server, run your own (above), that's the normal mode.
 
 ## Updating
